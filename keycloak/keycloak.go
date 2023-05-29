@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -19,8 +20,11 @@ type UserCreate struct {
 	Password  string `json:"password"`
 }
 type Message struct {
-	Text  string `json:"msg"`
-	Token string `json:"token"`
+	Text  string       `json:"msg"`
+	Token *gocloak.JWT `json:"token"`
+}
+type AccessToken struct {
+	Atoken string `json:"access_token"`
 }
 
 func KeycloakConnection() (*gocloak.JWT, context.Context, *gocloak.GoCloak) {
@@ -120,16 +124,57 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 	} else {
+
+		w.WriteHeader(http.StatusOK)
+
+		json.NewEncoder(w).Encode(token)
+
+		w.Header().Set("Content-Type", "application/json")
+
+	}
+
+}
+
+func IsLogin(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+	ctx := context.Background()
+	var atoken AccessToken
+	tokenErr := json.NewDecoder(r.Body).Decode(&atoken)
+	if tokenErr != nil {
+		http.Error(w, "Invalid JSON data", http.StatusBadRequest)
+		return
+	}
+	fmt.Println(atoken.Atoken)
+	rptResult, err := client.RetrospectToken(ctx, atoken.Atoken, os.Getenv("KEYCLOAK_CLIENT_ID"), os.Getenv("KEYCLOAK_CLIENT_SECRET"), os.Getenv("KEYCLOAK_REALM"))
+
+	if !*rptResult.Active {
 		message := Message{
-			Text:  "Login success",
-			Token: token.AccessToken,
+			Text: "Login Error",
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+
+		json.NewEncoder(w).Encode(message)
+		fmt.Println("Token is not active")
+
+	} else {
+
+		message := Message{
+			Text: "Login is Success",
 		}
 		w.WriteHeader(http.StatusOK)
 
 		json.NewEncoder(w).Encode(message)
+		fmt.Println("Token is active")
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-
+	if err != nil {
+		fmt.Println("Inspection failed:" + err.Error())
 	}
 
 }
