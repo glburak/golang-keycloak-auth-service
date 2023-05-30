@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Sayfası</title>
+</head>
+<body>
+  <h2>Giriş Yap</h2>
+  <form id="loginForm" action="http://localhost:8081/user/login" method="POST">
+    <label for="username">Kullanıcı Adı:</label>
+    <input type="text" id="username" name="username" required><br><br>
+    <label for="password">Şifre:</label>
+    <input type="password" id="password" name="password" required><br><br>
+    <input type="submit" value="Giriş Yap">
+  </form>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", function(event) {
+      event.preventDefault(); // Formun varsayılan submit işlemini engelle
+      var form = document.getElementById("loginForm");
+      var formData = new FormData(form);
+      var jsonData = {};
+
+      for (var pair of formData.entries()) {
+        jsonData[pair[0]] = pair[1];
+      }
+
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", form.action, true);
+      xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          // İsteğin başarıyla tamamlandığı durumda yapılacak işlemler
+          var response = JSON.parse(xhr.responseText);
+          console.log(response); // Sunucudan gelen yanıtı konsola yazdır
+        }
+      };
+      xhr.send(JSON.stringify(jsonData));
+    });
+  </script>
+</body>
+</html>

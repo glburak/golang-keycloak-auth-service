@@ -105,7 +105,11 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 }
 func UserLogin(w http.ResponseWriter, r *http.Request) {
-
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization") // You can add more headers here if needed
+	} else {
+		// Your code goes here
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -134,12 +138,11 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 	} else {
+		var bearer = "Bearer " + token.AccessToken
+		w.Header().Set("Authorization", bearer)
 
 		w.WriteHeader(http.StatusOK)
-
 		json.NewEncoder(w).Encode(token)
-
-		w.Header().Set("Content-Type", "application/json")
 
 	}
 
@@ -192,7 +195,6 @@ func IsLogin(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Inspection failed:" + err.Error())
 	} else {
 		json.NewEncoder(w).Encode(response)
-
 
 	}
 
