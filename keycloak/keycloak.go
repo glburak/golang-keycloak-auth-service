@@ -12,6 +12,15 @@ import (
 	"github.com/Nerzal/gocloak"
 )
 
+var (
+	keycloakURL     = os.Getenv("KEYCLOAK_URL")
+	realm           = os.Getenv("KEYCLOAK_REALM")
+	clientID        = os.Getenv("KEYCLOAK_CLIENT_ID")
+	clientSecret    = os.Getenv("KEYCLOAK_CLIENT_SECRET")
+	serviceUsername = os.Getenv("KEYCLOAK_USER")
+	servicePassword = os.Getenv("KEYCLOAK_PASSWORD")
+)
+
 type UserCreate struct {
 	Username  string `json:"username"`
 	FirstName string `json:"firstname"`
@@ -23,18 +32,19 @@ type Message struct {
 	Text  string       `json:"msg"`
 	Token *gocloak.JWT `json:"token"`
 }
-type AccessToken struct {
-	Atoken string `json:"access_token"`
+type Token struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func KeycloakConnection() (*gocloak.JWT, context.Context, *gocloak.GoCloak) {
 
-	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+	client := gocloak.NewClient(keycloakURL)
 	restyClient := client.RestyClient()
 	restyClient.SetDebug(true)
 	restyClient.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	ctx := context.Background()
-	token, err := client.LoginAdmin(ctx, os.Getenv("KEYCLOAK_USER"), os.Getenv("KEYCLOAK_PASSWORD"), os.Getenv("KEYCLOAK_REALM"))
+	token, err := client.LoginAdmin(ctx, serviceUsername, servicePassword, realm)
 	if err != nil {
 
 		log.Println("Hata oluştu:", err)
@@ -70,7 +80,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		Username:  &user.Username,
 	}
 
-	_, err = client.CreateUser(ctx, accessToken.AccessToken, os.Getenv("KEYCLOAK_REALM"), userKeycloak)
+	_, err = client.CreateUser(ctx, accessToken.AccessToken, realm, userKeycloak)
 
 	if err != nil {
 
@@ -108,10 +118,10 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	username := user.Username
 	password := user.Password
-	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+	client := gocloak.NewClient(keycloakURL)
 	ctx := context.Background()
 
-	token, err2 := client.Login(ctx, os.Getenv("KEYCLOAK_CLIENT_ID"), os.Getenv("KEYCLOAK_CLIENT_SECRET"), os.Getenv("KEYCLOAK_REALM"), username, password)
+	token, err2 := client.Login(ctx, clientID, clientSecret, realm, username, password)
 
 	if err2 != nil {
 
@@ -142,16 +152,16 @@ func IsLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+	client := gocloak.NewClient(keycloakURL)
 	ctx := context.Background()
-	var atoken AccessToken
+	var atoken Token
 	tokenErr := json.NewDecoder(r.Body).Decode(&atoken)
 	if tokenErr != nil {
 		http.Error(w, "Invalid JSON data", http.StatusBadRequest)
 		return
 	}
-	fmt.Println(atoken.Atoken)
-	rptResult, err := client.RetrospectToken(ctx, atoken.Atoken, os.Getenv("KEYCLOAK_CLIENT_ID"), os.Getenv("KEYCLOAK_CLIENT_SECRET"), os.Getenv("KEYCLOAK_REALM"))
+	fmt.Println(atoken.AccessToken)
+	rptResult, err := client.RetrospectToken(ctx, atoken.AccessToken, clientID, clientSecret, realm)
 
 	if !*rptResult.Active {
 		message := Message{
@@ -175,6 +185,15 @@ func IsLogin(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println("Inspection failed:" + err.Error())
+	}
+
+	response, err := client.RefreshToken(ctx, atoken.RefreshToken, clientID, clientSecret, realm)
+	if err != nil {
+		fmt.Println("Inspection failed:" + err.Error())
+	} else {
+		json.NewEncoder(w).Encode(response)
+
+
 	}
 
 }
